@@ -1,110 +1,123 @@
-# FAST-LIVO2
+# FAST-LIVO2 ROS 2
 
-## FAST-LIVO2: Fast, Direct LiDAR-Inertial-Visual Odometry
+FAST-LIVO2 is a fast, direct LiDAR-inertial-visual odometry and mapping system. This repository is the ROS 2 port of the original ROS 1 package. Estimation and mapping algorithms are preserved; ROS communication, parameters, build files, and launch files use ROS 2 APIs.
 
-### 📢 News
+## Requirements
 
-- 🔓 **2025-01-23**: Code released!  
-- 🎉 **2024-10-01**: Accepted by **T-RO '24**!  
-- 🚀 **2024-07-02**: Conditionally accepted.
-
-### 📬 Contact
-
-For further inquiries or assistance, please contact [zhengcr@connect.hku.hk](mailto:zhengcr@connect.hku.hk).
-
-## 1. Introduction
-
-FAST-LIVO2 is an efficient and accurate LiDAR-inertial-visual fusion localization and mapping system, demonstrating significant potential for real-time 3D reconstruction and onboard robotic localization in severely degraded environments.
-
-**Developer**: [Chunran Zheng 郑纯然](https://github.com/xuankuzcr)
-
-<div align="center">
-    <img src="pics/Framework.png" width = 100% >
-</div>
-
-### 1.1 Related video
-
-Our accompanying video is now available on [**Bilibili**](https://www.bilibili.com/video/BV1Ezxge7EEi) and [**YouTube**](https://youtu.be/6dF2DzgbtlY).
-
-### 1.2 Related paper
-
-[FAST-LIVO2: Fast, Direct LiDAR-Inertial-Visual Odometry](https://arxiv.org/pdf/2408.14035)  
-
-[FAST-LIVO2 on Resource-Constrained Platforms](https://arxiv.org/pdf/2501.13876)  
-
-[FAST-LIVO: Fast and Tightly-coupled Sparse-Direct LiDAR-Inertial-Visual Odometry](https://arxiv.org/pdf/2203.00893)
-
-[FAST-Calib: LiDAR-Camera Extrinsic Calibration in One Second](https://www.arxiv.org/pdf/2507.17210)
-
-### 1.3 Our hard-synchronized equipment
-
-We open-source our handheld device, including CAD files, synchronization scheme, STM32 source code, wiring instructions, and sensor ROS driver. Access these resources at this repository: [**LIV_handhold**](https://github.com/xuankuzcr/LIV_handhold).
-
-### 1.4 Our associate dataset: FAST-LIVO2-Dataset
-Our associate dataset [**FAST-LIVO2-Dataset**](https://connecthkuhk-my.sharepoint.com/:f:/g/personal/zhengcr_connect_hku_hk/ErdFNQtjMxZOorYKDTtK4ugBkogXfq1OfDm90GECouuIQA?e=KngY9Z) used for evaluation is also available online.
-
-### 1.5 Our LiDAR-camera calibration method
-The [**FAST-Calib**](https://github.com/hku-mars/FAST-Calib) toolkit is recommended. Its output extrinsic parameters can be directly filled into the YAML file. 
-
-## 2. Prerequisited
-
-### 2.1 Ubuntu and ROS
-
-Ubuntu 18.04~20.04.  [ROS Installation](http://wiki.ros.org/ROS/Installation).
-
-### 2.2 PCL && Eigen && OpenCV
-
-PCL>=1.8, Follow [PCL Installation](https://pointclouds.org/). 
-
-Eigen>=3.3.4, Follow [Eigen Installation](https://eigen.tuxfamily.org/index.php?title=Main_Page).
-
-OpenCV>=4.2, Follow [Opencv Installation](http://opencv.org/).
-
-### 2.3 Sophus
-
-Sophus Installation for the non-templated/double-only version.
+Supported ROS 2 distributions are Foxy, Humble, and Jazzy. The recommended combinations are Ubuntu 20.04 + Foxy, Ubuntu 22.04 + Humble, and Ubuntu 24.04 + Jazzy. The code uses standard `rclcpp`, message, TF2, and `ament_cmake` APIs shared by these distributions.
 
 ```bash
-git clone https://github.com/strasdat/Sophus.git
-cd Sophus
-git checkout a621ff
-mkdir build && cd build && cmake ..
-make
-sudo make install
+sudo apt install ros-humble-desktop ros-humble-cv-bridge \
+  ros-humble-image-transport ros-humble-pcl-conversions \
+  ros-humble-tf2-ros ros-humble-visualization-msgs
 ```
 
-### 2.4 Vikit
+Also install Eigen >= 3.3.4, PCL >= 1.8, OpenCV >= 4.2, Sophus (double/non-templated), and `livox_ros_driver2`. The required Vikit headers are included in this source tree. ROS 1 is not required.
 
-Vikit contains camera models, some math and interpolation functions that we need. Vikit is a catkin project, therefore, download it into your catkin workspace source folder.
+## Build
 
 ```bash
-# Different from the one used in fast-livo1
-cd catkin_ws/src
-git clone https://github.com/xuankuzcr/rpg_vikit.git 
+source /opt/ros/humble/setup.bash
+cd ~/FAST-LIVO2_ros2
+colcon build --symlink-install
+source install/setup.bash
 ```
 
-## 3. Build
+For Foxy or Jazzy, source the matching distribution instead:
 
-Clone the repository and catkin_make:
-
-```
-cd ~/catkin_ws/src
-git clone https://github.com/hku-mars/FAST-LIVO2
-cd ../
-catkin_make
-source ~/catkin_ws/devel/setup.bash
+```bash
+source /opt/ros/foxy/setup.bash    # Ubuntu 20.04
+# or
+source /opt/ros/jazzy/setup.bash   # Ubuntu 24.04
 ```
 
-## 4. Run our examples
+The executable is `fastlivo_mapping` in package `fast_livo2`.
 
-Download FAST-LIVO2-Dataset from [Global-LVBA](https://github.com/xuankuzcr/Global-LVBA) Section IV.
+## Run
 
+```bash
+ros2 launch fast_livo2 mapping_avia.launch.py
+ros2 launch fast_livo2 mapping_avia_marslvig.launch.py
+ros2 launch fast_livo2 mapping_hesaixt32_hilti22.launch.py
+ros2 launch fast_livo2 mapping_ouster_ntu.launch.py
 ```
-roslaunch fast_livo mapping_avia.launch
-rosbag play YOUR_DOWNLOADED.bag
+
+Disable RViz with `rviz:=false`. Play a ROS 2 bag in another terminal:
+
+```bash
+source /opt/ros/humble/setup.bash
+source ~/FAST-LIVO2_ros2/install/setup.bash
+ros2 bag play /path/to/your_bag
 ```
 
+Launch files load the selected mapping and camera YAML files as node parameters. Topic names and algorithm parameters can be overridden with a ROS 2 parameter file.
 
-## 5. License
+## ROS 1 to ROS 2 differences
 
-The source code of this package is released under the [**GPLv2**](http://www.gnu.org/licenses/) license. For commercial use, please contact me at <zhengcr@connect.hku.hk> and Prof. Fu Zhang at <fuzhang@hku.hk> to discuss an alternative license.
+| Area | ROS 1 (`FAST-LIVO2`) | ROS 2 (`FAST-LIVO2_ros2`) |
+|---|---|---|
+| Build | `catkin_make` | `colcon build` with `ament_cmake` |
+| Package | `fast_livo` | `fast_livo2` |
+| Node API | `roscpp`, `ros::NodeHandle` | `rclcpp`, `rclcpp::Node` |
+| Messages | `sensor_msgs::Imu` | `sensor_msgs::msg::Imu` |
+| Time/callbacks | `ros::Time`, `ConstPtr` | `rclcpp::Time`, shared pointers |
+| Parameters | rosparam / `nh.param` | `declare_parameter` / `get_parameter` |
+| TF | `tf` | `tf2` / `tf2_ros` |
+| Livox | `livox_ros_driver` | `livox_ros_driver2` |
+| Launch | XML `.launch` | Python `.launch.py` |
+
+Visual-inertial estimation, LiDAR preprocessing, IMU propagation, and voxel mapping remain functionally aligned with ROS 1. Additional ROS 2 lines are middleware adaptation code, not new algorithm modules.
+
+## Known limitations
+
+- ROS 2 launch uses `rviz2`; ROS 1 XML launch files are not supported.
+- Livox topics must use the ROS 2 `livox_ros_driver2` `CustomMsg` definition.
+- OpenCV minor-version linker warnings may occur with `cv_bridge`; matching versions is recommended.
+
+## References and license
+
+- [FAST-LIVO2 paper](https://arxiv.org/pdf/2408.14035)
+- [Original ROS 1 repository](https://github.com/hku-mars/FAST-LIVO2)
+- [FAST-LIVO2 dataset](https://github.com/xuankuzcr/Global-LVBA)
+- [FAST-Calib](https://github.com/hku-mars/FAST-Calib)
+
+## Acknowledgements
+
+- [NESccee](https://github.com/NESccee)
+- [LiDAR_Inertial_Odometry](https://github.com/NESccee/LiDAR_Inertial_Odometry)
+
+GPLv2. Contact the FAST-LIVO2 authors for commercial licensing.
+
+## 中文说明
+
+FAST-LIVO2 ROS 2 是 FAST-LIVO2 的 ROS 2 移植版本。激光雷达、IMU、相机融合算法与 ROS 1 版本保持一致，改动主要集中在节点、消息、参数、TF、构建系统和启动文件。项目不再依赖 ROS 1 或 catkin。
+
+### 支持环境
+
+支持 ROS 2 Foxy、Humble 和 Jazzy，推荐环境如下：
+
+| ROS 2 | Ubuntu | 建议 |
+|---|---|---|
+| Foxy | 20.04 | 支持 |
+| Humble | 22.04 | 推荐 |
+| Jazzy | 24.04 | 支持 |
+
+三种发行版均使用相同的 `rclcpp`、`sensor_msgs`、`nav_msgs`、`tf2` 和 `ament_cmake` 接口。请先安装对应发行版的桌面组件、`cv_bridge`、`image_transport`、`pcl_conversions`、`tf2_ros`、`visualization_msgs`，以及 ROS 2 版 `livox_ros_driver2`。
+
+### 编译与运行
+
+```bash
+source /opt/ros/<发行版>/setup.bash
+cd ~/FAST-LIVO2_ros2
+colcon build --symlink-install
+source install/setup.bash
+ros2 launch fast_livo2 mapping_avia.launch.py
+```
+
+将 `<发行版>` 替换为 `foxy`、`humble` 或 `jazzy`。其他数据集启动文件见上文。参数和话题可通过 YAML 参数文件或 `ros2 param` 覆盖。
+
+### 注意事项
+
+- 必须使用 `livox_ros_driver2` 发布的 ROS 2 `CustomMsg`，不能使用 ROS 1 消息头。
+- 启动文件为 Python 格式 `.launch.py`，使用 `rviz2`，原 ROS 1 XML 启动文件不适用于 ROS 2。
+- 若 `cv_bridge` 与系统 OpenCV 小版本不同，链接阶段可能出现警告；建议统一 OpenCV 版本。

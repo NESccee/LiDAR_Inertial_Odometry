@@ -1,5 +1,19 @@
-cmake_minimum_required(VERSION 2.8.3)
-project(fast_livo)
+cmake_minimum_required(VERSION 3.8)
+project(fast_livo2)
+
+find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(cv_bridge REQUIRED)
+find_package(image_transport REQUIRED)
+find_package(pcl_conversions REQUIRED)
+find_package(livox_ros_driver2 REQUIRED)
+find_package(visualization_msgs REQUIRED)
 
 set(CMAKE_BUILD_TYPE "Release")
 message(STATUS "Build Type: ${CMAKE_BUILD_TYPE}")
@@ -75,45 +89,25 @@ else()
   message(STATUS "mimalloc not found, proceeding without it")
 endif()
 
-# Find catkin and required dependencies
-find_package(catkin REQUIRED COMPONENTS
-  geometry_msgs
-  nav_msgs
-  sensor_msgs
-  roscpp
-  rospy
-  std_msgs
-  pcl_ros
-  tf
-  message_generation
-  eigen_conversions
-  vikit_common
-  vikit_ros
-  cv_bridge
-  image_transport
-)
-
 find_package(Eigen3 REQUIRED)
 find_package(PCL REQUIRED)
 find_package(OpenCV REQUIRED)
-find_package(Sophus REQUIRED)
+find_path(SOPHUS_INCLUDE_DIR NAMES sophus/se3.hpp
+  PATHS /home/aidlux/Sophus /usr/local/include /usr/include
+  PATH_SUFFIXES include)
+if(NOT SOPHUS_INCLUDE_DIR)
+  message(FATAL_ERROR "Sophus headers not found")
+endif()
 find_package(Boost REQUIRED COMPONENTS thread)
 
-set(Sophus_LIBRARIES libSophus.so)
-
-# Define the catkin package
-catkin_package(
-  CATKIN_DEPENDS geometry_msgs nav_msgs roscpp rospy std_msgs message_runtime cv_bridge vikit_common vikit_ros image_transport
-  DEPENDS EIGEN3 PCL OpenCV Sophus
-)
+set(Sophus_LIBRARIES)
 
 # Include directories for dependencies
 include_directories(
-  ${catkin_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIR}
   ${PCL_INCLUDE_DIRS}
   ${OpenCV_INCLUDE_DIRS}
-  ${Sophus_INCLUDE_DIRS}
+  ${SOPHUS_INCLUDE_DIR}
   include
 )
 
@@ -123,6 +117,17 @@ add_library(lio src/voxel_map.cpp)
 add_library(pre src/preprocess.cpp)
 add_library(imu_proc src/IMU_Processing.cpp)
 add_library(laser_mapping src/LIVMapper.cpp)
+
+foreach(target vio lio pre imu_proc laser_mapping)
+  ament_target_dependencies(${target}
+    rclcpp geometry_msgs nav_msgs sensor_msgs std_msgs tf2 tf2_ros
+    cv_bridge image_transport pcl_conversions livox_ros_driver2 visualization_msgs)
+endforeach()
+
+if(OpenMP_CXX_FOUND)
+  add_compile_options(${OpenMP_CXX_FLAGS})
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_CXX_FLAGS}")
+endif()
 
 # Add the main executable
 add_executable(fastlivo_mapping src/main.cpp)
@@ -134,14 +139,21 @@ target_link_libraries(fastlivo_mapping
   lio
   pre
   imu_proc
-  ${catkin_LIBRARIES}
   ${PCL_LIBRARIES}
   ${OpenCV_LIBRARIES}
   ${Sophus_LIBRARIES}
   ${Boost_LIBRARIES}
 )
 
+ament_target_dependencies(fastlivo_mapping
+  rclcpp geometry_msgs nav_msgs sensor_msgs std_msgs tf2 tf2_ros
+  cv_bridge image_transport pcl_conversions livox_ros_driver2 visualization_msgs)
+
 # Link mimalloc if found
 if(mimalloc_FOUND)
   target_link_libraries(fastlivo_mapping mimalloc)
 endif()
+
+install(TARGETS fastlivo_mapping DESTINATION lib/${PROJECT_NAME})
+install(DIRECTORY config launch rviz_cfg DESTINATION share/${PROJECT_NAME})
+ament_package()

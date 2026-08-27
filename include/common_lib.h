@@ -17,13 +17,15 @@ which is included as part of this source code package.
 #include <utils/types.h>
 #include <utils/color.h>
 #include <opencv2/opencv.hpp>
-#include <sensor_msgs/Imu.h>
-#include <sophus/se3.h>
-#include <tf/transform_broadcaster.h>
+#include <sensor_msgs/msg/imu.hpp>
+#include <sophus/se3.hpp>
+#include <rclcpp/rclcpp.hpp>
+
+#define ROS_ASSERT(x) do { if (!(x)) throw std::runtime_error("FAST-LIVO2 assertion failed: " #x); } while (0)
+#define ROS_INFO(...) RCLCPP_INFO(rclcpp::get_logger("fast_livo2"), __VA_ARGS__)
 
 using namespace std;
 using namespace Eigen;
-using namespace Sophus;
 
 #define print_line std::cout << __FILE__ << ", " << __LINE__ << std::endl;
 #define G_m_s2 (9.81)   // Gravaty const in GuangDong/China
@@ -63,7 +65,7 @@ struct MeasureGroup
 {
   double vio_time;
   double lio_time;
-  deque<sensor_msgs::Imu::ConstPtr> imu;
+  deque<sensor_msgs::msg::Imu::SharedPtr> imu;
   cv::Mat img;
   MeasureGroup()
   {
@@ -164,7 +166,7 @@ struct StatesGroup
     return *this;
   };
 
-  StatesGroup operator+(const Matrix<double, DIM_STATE, 1> &state_add)
+  StatesGroup operator+(const Eigen::Matrix<double, DIM_STATE, 1> &state_add)
   {
     StatesGroup a;
     a.rot_end = this->rot_end * Exp(state_add(0, 0), state_add(1, 0), state_add(2, 0));
@@ -179,7 +181,7 @@ struct StatesGroup
     return a;
   };
 
-  StatesGroup &operator+=(const Matrix<double, DIM_STATE, 1> &state_add)
+  StatesGroup &operator+=(const Eigen::Matrix<double, DIM_STATE, 1> &state_add)
   {
     this->rot_end = this->rot_end * Exp(state_add(0, 0), state_add(1, 0), state_add(2, 0));
     this->pos_end += state_add.block<3, 1>(3, 0);
@@ -191,9 +193,9 @@ struct StatesGroup
     return *this;
   };
 
-  Matrix<double, DIM_STATE, 1> operator-(const StatesGroup &b)
+  Eigen::Matrix<double, DIM_STATE, 1> operator-(const StatesGroup &b)
   {
-    Matrix<double, DIM_STATE, 1> a;
+    Eigen::Matrix<double, DIM_STATE, 1> a;
     M3D rotd(b.rot_end.transpose() * this->rot_end);
     a.block<3, 1>(0, 0) = Log(rotd);
     a.block<3, 1>(3, 0) = this->pos_end - b.pos_end;
@@ -219,12 +221,12 @@ struct StatesGroup
   V3D bias_g;                               // gyroscope bias
   V3D bias_a;                               // accelerator bias
   V3D gravity;                              // the estimated gravity acceleration
-  Matrix<double, DIM_STATE, DIM_STATE> cov; // states covariance
+  Eigen::Matrix<double, DIM_STATE, DIM_STATE> cov; // states covariance
 };
 
 template <typename T>
-auto set_pose6d(const double t, const Matrix<T, 3, 1> &a, const Matrix<T, 3, 1> &g, const Matrix<T, 3, 1> &v, const Matrix<T, 3, 1> &p,
-                const Matrix<T, 3, 3> &R)
+auto set_pose6d(const double t, const Eigen::Matrix<T, 3, 1> &a, const Eigen::Matrix<T, 3, 1> &g, const Eigen::Matrix<T, 3, 1> &v, const Eigen::Matrix<T, 3, 1> &p,
+                const Eigen::Matrix<T, 3, 3> &R)
 {
   Pose6D rot_kp;
   rot_kp.offset_time = t;

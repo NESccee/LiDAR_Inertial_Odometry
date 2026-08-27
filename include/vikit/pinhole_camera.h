@@ -1,0 +1,7 @@
+#pragma once
+#include <opencv2/opencv.hpp>
+#include <Eigen/Core>
+namespace vk {
+class AbstractCamera { public: virtual ~AbstractCamera()=default; virtual double fx()const=0; virtual double fy()const=0; virtual double cx()const=0; virtual double cy()const=0; virtual int width()const=0; virtual int height()const=0; virtual double scale()const{return 1.0;} virtual Eigen::Vector2d world2cam(const Eigen::Vector3d&p)const=0; virtual Eigen::Vector3d cam2world(double x,double y)const=0; virtual Eigen::Vector3d cam2world(const Eigen::Vector2d&p)const{return cam2world(p.x(),p.y());} virtual bool isInFrame(const Eigen::Vector2i&p,int border)const{return p.x()>=border&&p.y()>=border&&p.x()<width()-border&&p.y()<height()-border;} };
+class PinholeCamera: public AbstractCamera { double fx_,fy_,cx_,cy_; int w_,h_; public: PinholeCamera(int w,int h,double fx,double fy,double cx,double cy):fx_(fx),fy_(fy),cx_(cx),cy_(cy),w_(w),h_(h){} double fx()const override{return fx_;} double fy()const override{return fy_;} double cx()const override{return cx_;} double cy()const override{return cy_;} int width()const override{return w_;} int height()const override{return h_;} Eigen::Vector2d world2cam(const Eigen::Vector3d&p)const override{return {fx_*p.x()/p.z()+cx_,fy_*p.y()/p.z()+cy_};} Eigen::Vector3d cam2world(double x,double y)const override{return Eigen::Vector3d((x-cx_)/fx_,(y-cy_)/fy_,1).normalized();} void undistortImage(const cv::Mat&src,cv::Mat&dst)const{dst=src;} };
+}
