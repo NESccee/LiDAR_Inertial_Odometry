@@ -134,7 +134,7 @@ source /opt/ros/jazzy/setup.bash
 source ~/T100_ws/bsp/livox_ros_driver2/install/setup.bash
 source ~/T100_ws/bsp/fast_lio/.colcon_install/setup.bash
 
-ros2 launch ~/T100_ws/bsp/fast_lio/launch/mapping.launch.py config_path:=~/T100_ws/bsp/fast_lio/config config_file:=t100.yaml rviz:=false
+ros2 launch $HOME/T100_ws/bsp/fast_lio/launch/mapping.launch.py config_path:=$HOME/T100_ws/bsp/fast_lio/config config_file:=t100.yaml rviz:=false
 ~~~
 
 需要 RViz 时，将 rviz:=false 改为 rviz:=true。
@@ -183,4 +183,3 @@ Initialize the map kdtree
 pkill -INT -x fastlio_mapping
 pkill -INT -x livox_ros_driver2_node
 ~~~
-
