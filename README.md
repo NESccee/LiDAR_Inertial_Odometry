@@ -21,6 +21,30 @@ livox_ros_driver2/
   config/T100_config.json
 ~~~
 
+## 本地 bsp 工作空间编译
+
+本机实际使用的是 ROS 2 工作空间：
+
+~~~text
+~/T100_ws/bsp/livox_ros_driver2/
+  src/livox_ros_driver2/    ROS 2 驱动包源码
+  install/                  驱动安装结果
+~~~
+
+编译驱动：
+
+~~~bash
+cd ~/T100_ws/bsp/livox_ros_driver2/src/livox_ros_driver2
+./build.sh jazzy
+~~~
+
+加载本机已安装的驱动：
+
+~~~bash
+source /opt/ros/jazzy/setup.bash
+source ~/T100_ws/bsp/livox_ros_driver2/install/setup.bash
+~~~
+
 ## 编译 GitHub 组合仓库
 
 假设组合仓库位于 ~/T100_ws/LiDAR_Inertial_Odometry：
@@ -29,7 +53,7 @@ livox_ros_driver2/
 cd ~/T100_ws/LiDAR_Inertial_Odometry
 source /opt/ros/jazzy/setup.bash
 
-colcon build --base-paths livox_ros_driver2 +  --build-base build_driver +  --install-base install_driver +  --executor sequential +  --parallel-workers 1 +  --packages-select livox_ros_driver2 +  --cmake-args -DROS_EDITION=ROS2 -DDISTRO_ROS=jazzy
+colcon build --base-paths livox_ros_driver2 --build-base build_driver --install-base install_driver --executor sequential --parallel-workers 1 --packages-select livox_ros_driver2 --cmake-args -DROS_EDITION=ROS2 -DDISTRO_ROS=jazzy
 source install_driver/setup.bash
 ~~~
 
@@ -41,7 +65,7 @@ source /opt/ros/jazzy/setup.bash
 source ../install_driver/setup.bash
 git submodule update --init --depth 1
 
-taskset -c 0 env MAKEFLAGS=-j1 CMAKE_BUILD_PARALLEL_LEVEL=1 +colcon --log-base .colcon_log build +  --base-paths . +  --build-base .colcon_build +  --install-base .colcon_install +  --executor sequential +  --parallel-workers 1 +  --packages-select fast_lio +  --cmake-args -DCMAKE_BUILD_TYPE=Release
+taskset -c 0 env MAKEFLAGS=-j1 CMAKE_BUILD_PARALLEL_LEVEL=1 colcon --log-base .colcon_log build --base-paths . --build-base .colcon_build --install-base .colcon_install --executor sequential --parallel-workers 1 --packages-select fast_lio --cmake-args -DCMAKE_BUILD_TYPE=Release
 source .colcon_install/setup.bash
 ~~~
 
@@ -56,6 +80,15 @@ ping -I end0 -c 2 192.168.1.10
 ~~~
 
 ## 启动
+
+本机 bsp 工作空间的驱动启动命令：
+
+~~~bash
+cd ~/T100_ws
+source /opt/ros/jazzy/setup.bash
+source ~/T100_ws/bsp/livox_ros_driver2/install/setup.bash
+ros2 launch livox_ros_driver2 msg_T100_launch.py
+~~~
 
 终端 1，启动 T100 驱动。启动文件会自动发送 SAMPLING 控制命令：
 
@@ -73,7 +106,7 @@ cd ~/T100_ws/LiDAR_Inertial_Odometry/fast_lio
 source /opt/ros/jazzy/setup.bash
 source ../install_driver/setup.bash
 source .colcon_install/setup.bash
-ros2 launch ./launch/mapping.launch.py +  config_path:=./config +  config_file:=t100.yaml +  rviz:=true
+ros2 launch ./launch/mapping.launch.py config_path:=./config config_file:=t100.yaml rviz:=true
 ~~~
 
 ## 验证
