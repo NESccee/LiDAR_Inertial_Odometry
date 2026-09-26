@@ -1,26 +1,41 @@
 # DJI T100 Livox ROS 2 FAST-LIO
 
-本仓库将 DJI T100 360° 激光雷达接入 ROS 2 Jazzy，并使用 FAST-LIO 进行激光惯性里程计。项目包含 Livox SDK2、livox_ros_driver2 和 FAST-LIO ROS 2。
+本目录用于在 ROS 2 Jazzy 下使用 DJI T100 360° 激光雷达，并通过 FAST-LIO 输出激光惯性里程计。
 
-## 源码结构
+项目包含：
+
+- Livox SDK2：雷达底层 SDK
+- livox_ros_driver2：ROS 2 驱动和 T100 专用控制命令
+- FAST-LIO：点云和 IMU 融合定位
+
+## 目录结构
 
 ~~~text
 ~/T100_ws/bsp/
-  livox-sdk2/                         Livox SDK2
-  livox_ros_driver2/                  ROS 2 驱动工作空间
-    src/livox_ros_driver2/            驱动 ROS 2 包和原生 build.sh
-  fast_lio/                           FAST-LIO ROS 2 包
+├── livox-sdk2/
+├── livox_ros_driver2/
+│   ├── src/livox_ros_driver2/
+│   │   ├── build.sh
+│   │   ├── config/T100_config.json
+│   │   └── launch_ROS2/
+│   └── install/
+└── fast_lio/
+    ├── config/t100.yaml
+    ├── launch/mapping.launch.py
+    └── .colcon_install/
 ~~~
 
-livox_ros_driver2 必须保留在 ROS 工作空间的 src 目录下。原生 build.sh 会从该目录回到工作空间根目录执行 colcon。
+T100 网络参数：
 
-## 依赖
+~~~text
+雷达：192.168.1.10
+主机：192.168.1.20/24
+控制端口：60000
+点云端口：60001
+IMU 端口：60003
+~~~
 
-- Ubuntu 24.04
-- ROS 2 Jazzy
-- CMake、Git、colcon、PCL、Eigen
-- 连接 T100 的网卡：192.168.1.20/24
-- T100 地址：192.168.1.10
+## 1. 安装依赖
 
 ~~~bash
 sudo apt update
@@ -28,7 +43,7 @@ sudo apt install -y build-essential cmake git python3-colcon-common-extensions l
 source /opt/ros/jazzy/setup.bash
 ~~~
 
-配置网卡（以 end0 为例）：
+配置连接雷达的网卡，以下以 end0 为例：
 
 ~~~bash
 sudo ip link set end0 up
@@ -36,16 +51,7 @@ sudo ip addr replace 192.168.1.20/24 dev end0
 ping -I end0 -c 2 192.168.1.10
 ~~~
 
-## 获取源码
-
-~~~bash
-git clone --recursive https://github.com/NESccee/LiDAR_Inertial_Odometry.git ~/T100_ws/bsp
-cd ~/T100_ws/bsp
-git checkout t100fastlio
-git submodule update --init --depth 1
-~~~
-
-## 编译 Livox SDK2
+## 2. 编译 Livox SDK2
 
 ~~~bash
 cd ~/T100_ws/bsp/livox-sdk2
@@ -55,9 +61,9 @@ sudo cmake --install build
 sudo ldconfig
 ~~~
 
-## 编译 ROS 2 驱动
+## 3. 编译 livox_ros_driver2
 
-驱动使用官方原生 build.sh，不能从驱动包目录外调用 colcon 替代：
+必须从驱动包目录执行原生 build.sh：
 
 ~~~bash
 cd ~/T100_ws/bsp/livox_ros_driver2/src/livox_ros_driver2
@@ -65,9 +71,16 @@ source /opt/ros/jazzy/setup.bash
 ./build.sh jazzy
 ~~~
 
-原生脚本会在 ~/T100_ws/bsp/livox_ros_driver2/ 下生成 build、install 和 log。加载驱动环境：
+驱动安装目录：
+
+~~~text
+~/T100_ws/bsp/livox_ros_driver2/install
+~~~
+
+加载驱动环境：
 
 ~~~bash
+source /opt/ros/jazzy/setup.bash
 source ~/T100_ws/bsp/livox_ros_driver2/install/setup.bash
 ~~~
 
@@ -77,26 +90,21 @@ T100 配置文件：
 ~/T100_ws/bsp/livox_ros_driver2/src/livox_ros_driver2/config/T100_config.json
 ~~~
 
-T100 使用端口：
+## 4. 编译 FAST-LIO
 
-~~~text
-控制：60000    点云：60001    IMU：60003
-~~~
-
-## 编译 FAST-LIO
-
-仅使用一个 CPU 核心，并将构建结果放在 FAST-LIO 目录内：
+FAST-LIO 使用单核编译，构建文件只写入 fast_lio 目录：
 
 ~~~bash
 cd ~/T100_ws/bsp/fast_lio
 source /opt/ros/jazzy/setup.bash
 source ~/T100_ws/bsp/livox_ros_driver2/install/setup.bash
+git submodule update --init --depth 1
 
 taskset -c 0 env MAKEFLAGS=-j1 CMAKE_BUILD_PARALLEL_LEVEL=1 colcon --log-base .colcon_log build --base-paths . --build-base .colcon_build --install-base .colcon_install --executor sequential --parallel-workers 1 --packages-select fast_lio --cmake-args -DCMAKE_BUILD_TYPE=Release
-source .colcon_install/setup.bash
+source ~/T100_ws/bsp/fast_lio/.colcon_install/setup.bash
 ~~~
 
-## 启动 T100 驱动
+## 5. 启动 T100 驱动
 
 终端 1：
 
@@ -107,14 +115,16 @@ source ../../install/setup.bash
 ros2 launch livox_ros_driver2 msg_T100_launch.py
 ~~~
 
-该启动文件会先向 T100 的 UDP 60000 端口发送兼容的 SAMPLING 命令，然后启动驱动。驱动发布：
+启动文件会先发送 T100 兼容的 SAMPLING 命令，然后启动驱动。
+
+驱动话题：
 
 ~~~text
 /livox/lidar
 /livox/imu
 ~~~
 
-## 启动 FAST-LIO
+## 6. 启动 FAST-LIO
 
 终端 2：
 
@@ -122,44 +132,55 @@ ros2 launch livox_ros_driver2 msg_T100_launch.py
 cd ~/T100_ws/bsp/fast_lio
 source /opt/ros/jazzy/setup.bash
 source ~/T100_ws/bsp/livox_ros_driver2/install/setup.bash
-source .colcon_install/setup.bash
-
-ros2 launch ~/T100_ws/bsp/fast_lio/launch/mapping.launch.py config_path:=~/T100_ws/bsp/fast_lio/config config_file:=t100.yaml rviz:=true
-~~~
-
-如不需要 RViz，将 rviz:=true 改为 rviz:=false。
-
-## 查看数据
-
-~~~bash
-source /opt/ros/jazzy/setup.bash
-source ~/T100_ws/bsp/livox_ros_driver2/install/setup.bash
 source ~/T100_ws/bsp/fast_lio/.colcon_install/setup.bash
 
+ros2 launch ~/T100_ws/bsp/fast_lio/launch/mapping.launch.py config_path:=~/T100_ws/bsp/fast_lio/config config_file:=t100.yaml rviz:=false
+~~~
+
+需要 RViz 时，将 rviz:=false 改为 rviz:=true。
+
+## 7. 查看数据
+
+查看原始点云和 IMU：
+
+~~~bash
 ros2 topic hz /livox/lidar
 ros2 topic hz /livox/imu
+~~~
+
+查看 FAST-LIO 位置：
+
+~~~bash
 ros2 topic hz /Odometry
 ros2 topic echo /Odometry --field pose.pose.position
 ~~~
 
-FAST-LIO 点云话题：
+FAST-LIO 点云：
 
 ~~~text
 /cloud_registered
 /cloud_registered_body
 ~~~
 
-位置和姿态可通过 TF 查看：
+查看位置和姿态 TF：
 
 ~~~bash
 ros2 run tf2_ros tf2_echo camera_init body
 ~~~
 
-## 停止
+启动日志出现以下内容表示初始化完成：
+
+~~~text
+IMU Initial Done
+Initialize the map kdtree
+~~~
+
+## 8. 停止程序
+
+优先在启动终端按 Ctrl+C。必要时执行：
 
 ~~~bash
 pkill -INT -x fastlio_mapping
 pkill -INT -x livox_ros_driver2_node
 ~~~
 
-各组件的许可证和上游版权声明保留在对应目录。
