@@ -79,9 +79,9 @@ sudo ip addr replace 192.168.1.20/24 dev end0
 ping -I end0 -c 2 192.168.1.10
 ~~~
 
-## 启动
+## 本机启动
 
-本机 bsp 工作空间的驱动启动命令：
+终端 1，启动 T100 驱动。启动文件会自动发送 SAMPLING 控制命令：
 
 ~~~bash
 cd ~/T100_ws
@@ -90,23 +90,14 @@ source ~/T100_ws/bsp/livox_ros_driver2/install/setup.bash
 ros2 launch livox_ros_driver2 msg_T100_launch.py
 ~~~
 
-终端 1，启动 T100 驱动。启动文件会自动发送 SAMPLING 控制命令：
+终端 2，启动 FAST-LIO。本机 FAST-LIO 安装环境是 bsp/fast_lio/.colcon_install：
 
 ~~~bash
-cd ~/T100_ws/LiDAR_Inertial_Odometry
+cd ~/T100_ws
 source /opt/ros/jazzy/setup.bash
-source install_driver/setup.bash
-ros2 launch livox_ros_driver2 msg_T100_launch.py
-~~~
-
-终端 2，启动 FAST-LIO：
-
-~~~bash
-cd ~/T100_ws/LiDAR_Inertial_Odometry/fast_lio
-source /opt/ros/jazzy/setup.bash
-source ../install_driver/setup.bash
-source .colcon_install/setup.bash
-ros2 launch ./launch/mapping.launch.py config_path:=./config config_file:=t100.yaml rviz:=true
+source ~/T100_ws/bsp/livox_ros_driver2/install/setup.bash
+source ~/T100_ws/bsp/fast_lio/.colcon_install/setup.bash
+ros2 launch /home/lckfb/T100_ws/bsp/fast_lio/launch/mapping.launch.py config_path:=/home/lckfb/T100_ws/bsp/fast_lio/config config_file:=t100.yaml rviz:=false
 ~~~
 
 ## 验证
