@@ -5,7 +5,7 @@
 ## 源码结构
 
 ~~~text
-<workspace>/
+~/T100_ws/bsp/
   livox-sdk2/                         Livox SDK2
   livox_ros_driver2/                  ROS 2 驱动工作空间
     src/livox_ros_driver2/            驱动 ROS 2 包和原生 build.sh
@@ -39,8 +39,8 @@ ping -I end0 -c 2 192.168.1.10
 ## 获取源码
 
 ~~~bash
-git clone --recursive https://github.com/NESccee/LiDAR_Inertial_Odometry.git <workspace>
-cd <workspace>
+git clone --recursive https://github.com/NESccee/LiDAR_Inertial_Odometry.git ~/T100_ws/bsp
+cd ~/T100_ws/bsp
 git checkout t100fastlio
 git submodule update --init --depth 1
 ~~~
@@ -48,7 +48,7 @@ git submodule update --init --depth 1
 ## 编译 Livox SDK2
 
 ~~~bash
-cd <workspace>/livox-sdk2
+cd ~/T100_ws/bsp/livox-sdk2
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel 1
 sudo cmake --install build
@@ -60,21 +60,21 @@ sudo ldconfig
 驱动使用官方原生 build.sh，不能从驱动包目录外调用 colcon 替代：
 
 ~~~bash
-cd <workspace>/livox_ros_driver2/src/livox_ros_driver2
+cd ~/T100_ws/bsp/livox_ros_driver2/src/livox_ros_driver2
 source /opt/ros/jazzy/setup.bash
 ./build.sh jazzy
 ~~~
 
-原生脚本会在 <workspace>/livox_ros_driver2/ 下生成 build、install 和 log。加载驱动环境：
+原生脚本会在 ~/T100_ws/bsp/livox_ros_driver2/ 下生成 build、install 和 log。加载驱动环境：
 
 ~~~bash
-source <workspace>/livox_ros_driver2/install/setup.bash
+source ~/T100_ws/bsp/livox_ros_driver2/install/setup.bash
 ~~~
 
 T100 配置文件：
 
 ~~~text
-<workspace>/livox_ros_driver2/src/livox_ros_driver2/config/T100_config.json
+~/T100_ws/bsp/livox_ros_driver2/src/livox_ros_driver2/config/T100_config.json
 ~~~
 
 T100 使用端口：
@@ -88,9 +88,9 @@ T100 使用端口：
 仅使用一个 CPU 核心，并将构建结果放在 FAST-LIO 目录内：
 
 ~~~bash
-cd <workspace>/fast_lio
+cd ~/T100_ws/bsp/fast_lio
 source /opt/ros/jazzy/setup.bash
-source <workspace>/livox_ros_driver2/install/setup.bash
+source ~/T100_ws/bsp/livox_ros_driver2/install/setup.bash
 
 taskset -c 0 env MAKEFLAGS=-j1 CMAKE_BUILD_PARALLEL_LEVEL=1 colcon --log-base .colcon_log build --base-paths . --build-base .colcon_build --install-base .colcon_install --executor sequential --parallel-workers 1 --packages-select fast_lio --cmake-args -DCMAKE_BUILD_TYPE=Release
 source .colcon_install/setup.bash
@@ -101,7 +101,7 @@ source .colcon_install/setup.bash
 终端 1：
 
 ~~~bash
-cd <workspace>/livox_ros_driver2/src/livox_ros_driver2
+cd ~/T100_ws/bsp/livox_ros_driver2/src/livox_ros_driver2
 source /opt/ros/jazzy/setup.bash
 source ../../install/setup.bash
 ros2 launch livox_ros_driver2 msg_T100_launch.py
@@ -119,12 +119,12 @@ ros2 launch livox_ros_driver2 msg_T100_launch.py
 终端 2：
 
 ~~~bash
-cd <workspace>/fast_lio
+cd ~/T100_ws/bsp/fast_lio
 source /opt/ros/jazzy/setup.bash
-source <workspace>/livox_ros_driver2/install/setup.bash
+source ~/T100_ws/bsp/livox_ros_driver2/install/setup.bash
 source .colcon_install/setup.bash
 
-ros2 launch <workspace>/fast_lio/launch/mapping.launch.py config_path:=<workspace>/fast_lio/config config_file:=t100.yaml rviz:=true
+ros2 launch ~/T100_ws/bsp/fast_lio/launch/mapping.launch.py config_path:=~/T100_ws/bsp/fast_lio/config config_file:=t100.yaml rviz:=true
 ~~~
 
 如不需要 RViz，将 rviz:=true 改为 rviz:=false。
@@ -133,8 +133,8 @@ ros2 launch <workspace>/fast_lio/launch/mapping.launch.py config_path:=<workspac
 
 ~~~bash
 source /opt/ros/jazzy/setup.bash
-source <workspace>/livox_ros_driver2/install/setup.bash
-source <workspace>/fast_lio/.colcon_install/setup.bash
+source ~/T100_ws/bsp/livox_ros_driver2/install/setup.bash
+source ~/T100_ws/bsp/fast_lio/.colcon_install/setup.bash
 
 ros2 topic hz /livox/lidar
 ros2 topic hz /livox/imu
@@ -163,4 +163,3 @@ pkill -INT -x livox_ros_driver2_node
 ~~~
 
 各组件的许可证和上游版权声明保留在对应目录。
-
