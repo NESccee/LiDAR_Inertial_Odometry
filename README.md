@@ -1,42 +1,54 @@
-# T100 Livox ROS 2 FAST-LIO
+# DJI T100 Livox ROS 2 FAST-LIO
 
-本仓库包含 DJI T100 定制激光雷达所需的 Livox SDK2、ROS 2 驱动和 FAST-LIO ROS 2。
-默认环境为 Ubuntu 24.04、ROS 2 Jazzy，主机网卡连接 T100 后使用 `192.168.1.20/24`，雷达地址为 `192.168.1.10`。
+本仓库将 DJI T100 机载 360° 激光雷达接入 ROS 2 Jazzy，并使用 FAST-LIO 进行激光惯性里程计。T100 使用 Livox/Mid-360 兼容的点云和 IMU 数据格式，但控制端口是 DJI 定制协议，因此必须使用仓库内的 T100 配置和启动文件。
 
-## 项目组成声明
+## 组件声明
 
-本项目明确使用以下三个开源组件：
+本项目组合使用以下三个开源组件：
 
-- **Livox SDK2**：负责 Livox/T100 雷达底层设备通信和数据协议处理，目录为 `livox-sdk2/`。
-- **livox_ros_driver2**：负责将 T100 点云和 IMU 数据接入 ROS 2，并发送 T100 专用 `SAMPLING` 控制命令，目录为 `livox_ros_driver2/`。
-- **FAST-LIO ROS 2**：负责融合点云与 IMU，输出实时里程计和地图，目录为 `fast_lio/`。
+- `livox-sdk2/`：Livox SDK2，提供底层雷达通信和数据解析。
+- `livox_ros_driver2/`：ROS 2 驱动，发布 T100 点云与 IMU，并发送兼容 T100 的 `SAMPLING` 命令。
+- `fast_lio/`：FAST-LIO ROS 2，融合点云和 IMU，发布里程计与地图。
 
-三个组件在本项目中组合使用：T100 通过 `livox_ros_driver2` 发布 `/livox/lidar` 和 `/livox/imu`，FAST-LIO 订阅这两个话题进行激光惯性里程计计算。各组件的许可证和上游版权声明保留在对应目录及文件中。
+对应数据流为：T100 -> `livox_ros_driver2` -> `/livox/lidar`、`/livox/imu` -> `fast_lio` -> `/Odometry`、`/cloud_registered`。
 
-## 目录
+## 目录结构
 
 ```text
-livox-sdk2/       Livox SDK2
-livox_ros_driver2/ ROS 2 驱动及 T100 配置
-fast_lio/         FAST-LIO ROS 2 及 t100.yaml
+livox-sdk2/          Livox SDK2 源码
+livox_ros_driver2/   ROS 2 驱动、T100 配置和启动文件
+fast_lio/            FAST-LIO ROS 2 源码及 config/t100.yaml
 ```
 
-## 依赖
+## 环境和网络
+
+- Ubuntu 24.04（aarch64 已验证）
+- ROS 2 Jazzy
+- PCL、Eigen、CMake、Git、Python 3 和 `colcon`
+- 雷达地址：`192.168.1.10`
+- 主机连接雷达的网卡地址：`192.168.1.20/24`
+
+安装常用依赖：
 
 ```bash
 sudo apt update
-sudo apt install -y build-essential cmake git python3 python3-colcon-common-extensions \
+sudo apt install -y build-essential cmake git python3-colcon-common-extensions \
   libeigen3-dev libpcl-dev
 ```
 
-安装 ROS 2 Jazzy 后加载环境：
+配置网卡（以下以 `end0` 为例）：
 
 ```bash
-source /opt/ros/jazzy/setup.bash
-cd ~/T100_ws
+sudo ip link set end0 up
+sudo ip addr replace 192.168.1.20/24 dev end0
+ping -I end0 -c 2 192.168.1.10
 ```
 
-## 编译 SDK2
+## 编译
+
+以下命令都使用单任务编译，避免设备因并行编译卡死。假设仓库位于 `~/T100_ws`。
+
+### 1. 编译 Livox SDK2
 
 ```bash
 cd ~/T100_ws/livox-sdk2
@@ -46,7 +58,7 @@ sudo cmake --install build
 sudo ldconfig
 ```
 
-## 编译 ROS 2 驱动
+### 2. 编译 ROS 2 驱动
 
 ```bash
 cd ~/T100_ws
@@ -57,107 +69,91 @@ colcon build --executor sequential --parallel-workers 1 \
 source install/setup.bash
 ```
 
-驱动配置为 `livox_ros_driver2/config/T100_config.json`，并使用 T100 专用 UDP 端口：
+驱动配置文件为 `livox_ros_driver2/config/T100_config.json`，使用以下 T100 端口：
 
 ```text
-控制 60000，点云 60001，IMU 60003
+控制：60000    点云：60001    IMU：60003
 ```
 
-## 编译 FAST-LIO
+### 3. 编译 FAST-LIO
 
-首次获取源码时还需要初始化 `ikd-Tree` 子模块：
+首次获取源码时初始化 `ikd-Tree` 子模块：
 
 ```bash
 cd ~/T100_ws/fast_lio
 git submodule update --init --depth 1
 ```
 
-ROS 2 Jazzy 需要 C++17。为避免设备卡死，编译固定使用一个 CPU 核心：
+为避免使用工作空间根目录的构建结果，并将编译限制到 CPU 0，使用 FAST-LIO 目录内的独立目录：
 
 ```bash
-cd ~/T100_ws
+cd ~/T100_ws/fast_lio
 source /opt/ros/jazzy/setup.bash
-source install/setup.bash
+source ~/T100_ws/livox_ros_driver2/install/setup.bash
+
 taskset -c 0 env MAKEFLAGS=-j1 CMAKE_BUILD_PARALLEL_LEVEL=1 \
-  colcon build --executor sequential --parallel-workers 1 \
+colcon --log-base .colcon_log build \
+  --base-paths . \
+  --build-base .colcon_build \
+  --install-base .colcon_install \
+  --executor sequential \
+  --parallel-workers 1 \
   --packages-select fast_lio \
   --cmake-args -DCMAKE_BUILD_TYPE=Release
-source install/setup.bash
+source .colcon_install/setup.bash
 ```
 
-## 配置网卡
+编译输出位于 `fast_lio/.colcon_install`，不会写入其他 ROS 工作空间的 `build`、`install` 或 `log` 目录。若使用其他安装路径，请相应修改后续 `source` 命令。
 
-将连接雷达的网卡配置为 `192.168.1.20/24`。例如网卡名为 `end0`：
+## 运行
 
-```bash
-sudo ip link set end0 up
-sudo ip addr replace 192.168.1.20/24 dev end0
-ping -I end0 -c 2 192.168.1.10
-```
-
-## 启动 T100 驱动
-
-终端 1：
+终端 1，启动 T100 驱动。该启动文件会先向 `192.168.1.10:60000` 发送 T100 专用 `SAMPLING` 命令，再启动驱动：
 
 ```bash
 cd ~/T100_ws
 source /opt/ros/jazzy/setup.bash
-source install/setup.bash
+source livox_ros_driver2/install/setup.bash
 ros2 launch livox_ros_driver2 msg_T100_launch.py
 ```
 
-该 launch 会自动向 `192.168.1.10:60000` 发送 T100 兼容的 `SAMPLING` 命令，然后启动驱动。驱动发布：
-
-```text
-/livox/lidar   livox_ros_driver2/msg/CustomMsg
-/livox/imu     sensor_msgs/msg/Imu
-```
-
-## 启动 FAST-LIO
-
-终端 2：
+终端 2，启动 FAST-LIO（不启动 RViz 时将 `rviz` 设为 `false`）：
 
 ```bash
-cd ~/T100_ws
+cd ~/T100_ws/fast_lio
 source /opt/ros/jazzy/setup.bash
-source install/setup.bash
-ros2 launch fast_lio mapping.launch.py config_file:=t100.yaml rviz:=true
+source ~/T100_ws/livox_ros_driver2/install/setup.bash
+source .colcon_install/setup.bash
+ros2 launch ~/T100_ws/fast_lio/launch/mapping.launch.py \
+  config_path:=~/T100_ws/fast_lio/config \
+  config_file:=t100.yaml \
+  rviz:=true
 ```
 
-T100 配置文件为 `fast_lio/config/t100.yaml`，使用四线 Livox 点云、10 Hz 扫描和 `/livox/lidar`、`/livox/imu` 话题。
-
-## 查看坐标和状态
-
-终端 3 只查看位姿坐标：
+## 验证数据
 
 ```bash
-cd ~/T100_ws
 source /opt/ros/jazzy/setup.bash
-source install/setup.bash
-ros2 topic echo /Odometry --field pose.pose.position
-```
+source ~/T100_ws/livox_ros_driver2/install/setup.bash
+source ~/T100_ws/fast_lio/.colcon_install/setup.bash
 
-查看频率：
-
-```bash
 ros2 topic hz /livox/lidar
 ros2 topic hz /livox/imu
 ros2 topic hz /Odometry
+ros2 topic echo /Odometry --field pose.pose.position
 ```
 
-`/cloud_registered` 是世界坐标系点云；`/cloud_registered_body` 是雷达机体坐标系点云。
+正常运行时，T100 驱动发布 `/livox/lidar` 和 `/livox/imu`，FAST-LIO 发布 `/Odometry`、`/cloud_registered` 与 `/cloud_registered_body`。看到 `IMU Initial Done` 和 `Initialize the map kdtree` 表示 FAST-LIO 已完成初始化。
 
 ## 停止程序
 
-优先在各自 launch 终端按 `Ctrl+C`。也可以执行：
+优先在两个启动终端按 `Ctrl+C`。必要时可停止当前用户的节点：
 
 ```bash
 pkill -INT -x fastlio_mapping
 pkill -INT -x livox_ros_driver2_node
 ```
 
-确认没有重复启动的节点：
+## 许可证和上游
 
-```bash
-pgrep -a -f 'fastlio_mapping|livox_ros_driver2_node|ros2 launch'
-```
+各组件的许可证、版权声明和上游说明保留在对应目录中。Livox SDK2 和 ROS 2 驱动基于 Livox 官方项目，FAST-LIO 基于 FAST-LIO ROS 2 项目并包含 `ikd-Tree` 子模块。
+

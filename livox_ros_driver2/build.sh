@@ -5,6 +5,10 @@ readonly VERSION_ROS2="ROS2"
 readonly VERSION_HUMBLE="humble"
 readonly VERSION_JAZZY="jazzy"
 
+# ===== 编译核心数限制 =====
+# 修改此处即可控制编译使用的核心数
+readonly BUILD_JOBS=1
+
 pushd `pwd` > /dev/null
 cd `dirname $0`
 echo "Working Path: "`pwd`
@@ -28,6 +32,7 @@ else
     exit
 fi
 echo "ROS version is: "$ROS_VERSION
+echo "Build jobs is: "$BUILD_JOBS          # ← 新增日志
 
 # clear `build/` folder.
 # TODO: Do not clear these folders, if the last build is based on the same ROS version.
@@ -59,10 +64,15 @@ fi
 pushd `pwd` > /dev/null
 if [ $ROS_VERSION = ${VERSION_ROS1} ]; then
     cd ../../
-    catkin_make -DROS_EDITION=${VERSION_ROS1}
+    # ROS1: 用 -j 限制核心数
+    catkin_make -j${BUILD_JOBS} -DROS_EDITION=${VERSION_ROS1}
 elif [ $ROS_VERSION = ${VERSION_ROS2} ]; then
     cd ../../
-    colcon build --cmake-args -DROS_EDITION=${VERSION_ROS2} -DDISTRO_ROS=${ROS_DISTRO}
+    # ROS2: 限制包级并行 + 包内 CMake 并行
+    export CMAKE_BUILD_PARALLEL_LEVEL=${BUILD_JOBS}
+    colcon build \
+        --parallel-workers ${BUILD_JOBS} \
+        --cmake-args -DROS_EDITION=${VERSION_ROS2} -DDISTRO_ROS=${ROS_DISTRO}
 fi
 popd > /dev/null
 
