@@ -3,6 +3,16 @@
 本仓库包含 DJI T100 定制激光雷达所需的 Livox SDK2、ROS 2 驱动和 FAST-LIO ROS 2。
 默认环境为 Ubuntu 24.04、ROS 2 Jazzy，主机网卡连接 T100 后使用 `192.168.1.20/24`，雷达地址为 `192.168.1.10`。
 
+## 项目组成声明
+
+本项目明确使用以下三个开源组件：
+
+- **Livox SDK2**：负责 Livox/T100 雷达底层设备通信和数据协议处理，目录为 `livox-sdk2/`。
+- **livox_ros_driver2**：负责将 T100 点云和 IMU 数据接入 ROS 2，并发送 T100 专用 `SAMPLING` 控制命令，目录为 `livox_ros_driver2/`。
+- **FAST-LIO ROS 2**：负责融合点云与 IMU，输出实时里程计和地图，目录为 `fast_lio/`。
+
+三个组件在本项目中组合使用：T100 通过 `livox_ros_driver2` 发布 `/livox/lidar` 和 `/livox/imu`，FAST-LIO 订阅这两个话题进行激光惯性里程计计算。各组件的许可证和上游版权声明保留在对应目录及文件中。
+
 ## 目录
 
 ```text
